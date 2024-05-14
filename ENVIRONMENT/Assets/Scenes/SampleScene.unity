@@ -38,7 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0.2532999, g: 0.21698739, b: 0.23319131, a: 1}
+  m_IndirectSpecularColor: {r: 0.25330302, g: 0.21698889, b: 0.23319246, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -10140,8 +10140,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   descentSpeed: 10
-  initialHeight: 120
-  thrust: 100
+  initialHeight: 25
+  maxThrust: 30
+  stabilizationForce: 50
+  hasLanded: 0
 --- !u!54 &645472414
 Rigidbody:
   m_ObjectHideFlags: 0
