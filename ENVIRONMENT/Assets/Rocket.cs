@@ -1,70 +1,68 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading;
 
-public class Rocket : MonoBehaviour
+public class RocketLanding : MonoBehaviour
 {
-    TcpListener listener;
-    TcpClient client;
-    NetworkStream stream;
-    Thread clientThread;
+    public float descentSpeed = 10.0f; // Desired descent speed in meters per second
+    public float initialHeight = 25.0f; // Initial height in meters
+    public float maxThrust = 30.0f; // Maximum thrust force
+    public float stabilizationForce = 50.0f; // Force to stabilize the rocket orientation
+    Rigidbody rb;
 
     void Start()
     {
-        listener = new TcpListener(IPAddress.Parse("127.0.0.1"), 25001);
-        listener.Start();
-        clientThread = new Thread(new ThreadStart(HandleClient));
-        clientThread.Start();
+        // Set the initial position of the cylinder at 25 meters above the ground
+        transform.position = new Vector3(0, initialHeight, 0);
+
+        // Get the Rigidbody component
+        rb = GetComponent<Rigidbody>();
+
+        // Initial velocity downwards
+        rb.velocity = new Vector3(0, -descentSpeed, 0);
     }
 
-    void HandleClient()
+    void FixedUpdate()
     {
-        using (client = listener.AcceptTcpClient())
-        using (stream = client.GetStream())
+        ApplyThrustToControlDescent();
+        StabilizeRocketOrientation();
+    }
+
+    void ApplyThrustToControlDescent()
+    {
+        // Calculate the necessary thrust to slow down as the rocket approaches the ground
+        float requiredThrust = 0;
+        float velocityDifference = descentSpeed + rb.velocity.y;
+
+        // Apply thrust only if the rocket is moving faster than the desired speed
+        if (velocityDifference < 0)
         {
-            byte[] buffer = new byte[1024];
-            while (true)
-            {
-                int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                string[] parts = receivedData.Split(';');
-                if (parts.Length == 2)
-                {
-                    string[] posData = parts[0].Split(',');
-                    string[] rotData = parts[1].Split(',');
+            requiredThrust = Mathf.Clamp(-velocityDifference * rb.mass, 0, maxThrust);
+            rb.AddForce(transform.up * requiredThrust);
+        }
 
-                    Vector3 position = new Vector3(float.Parse(posData[0]), float.Parse(posData[1]), float.Parse(posData[2]));
-                    Quaternion rotation = Quaternion.Euler(float.Parse(rotData[0]), float.Parse(rotData[1]), float.Parse(rotData[2]));
-
-                    UpdateRocket(position, rotation);
-                }
-            }
+        // Soft landing check
+        if (transform.position.y <= 1.0f && Mathf.Abs(rb.velocity.y) < 1f)
+        {
+            // Neutralize any remaining downward velocity for a soft landing
+            rb.velocity = Vector3.zero;
+            rb.isKinematic = true; // Optionally make the Rigidbody kinematic after landing
         }
     }
 
-    void UpdateRocket(Vector3 position, Quaternion rotation)
+    void StabilizeRocketOrientation()
     {
-        transform.position = position;
-        transform.rotation = rotation;
-    }
+        // Calculate the angle difference from upright position
+        Quaternion targetRotation = Quaternion.Euler(0, 0, 0);
+        Quaternion currentRotation = transform.rotation;
+        Quaternion rotationDifference = targetRotation * Quaternion.Inverse(currentRotation);
 
-    void OnApplicationQuit()
-    {
-        if (clientThread != null)
+        // Convert rotation difference to angle and axis
+        rotationDifference.ToAngleAxis(out float angle, out Vector3 axis);
+        if (angle > 180)
         {
-            clientThread.Abort();
+            angle -= 360;
         }
-        if (client != null)
-        {
-            client.Close();
-        }
-        if (listener != null)
-        {
-            listener.Stop();
-        }
+
+        // Apply torque to correct the rotation
+        rb.AddTorque(axis * angle * stabilizationForce);
     }
 }
