@@ -1,14 +1,14 @@
 import socket
 import time
-import pandas as pd
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 host, port = "127.0.0.1", 25001
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.connect((host, port))
 
-# Set up a DataFrame to store and display the data
-columns = ['PosX', 'PosY', 'PosZ', 'RotX', 'RotY', 'RotZ']
-data_table = pd.DataFrame(columns=columns)
+positions = []  # Store positions for plotting
+rotations = []  # Store rotations for plotting
 
 try:
     while True:
@@ -19,22 +19,38 @@ try:
         sock.sendall(control_signal.encode("UTF-8"))
 
         # Receiving updated position and rotation from Unity
-        received_data = sock.recv(1024).decode("UTF-8").strip()
+        received_data = sock.recv(1024).decode("UTF-8")
         print("Received:", received_data)
 
         # Splitting position and rotation data
         pos_data, rot_data = received_data.split(';')
-        position = list(map(float, pos_data.split(',')))
-        rotation = list(map(float, rot_data.split(',')))
+        position_tuple = tuple(map(float, pos_data.split(',')))
+        rotation_tuple = tuple(map(float, rot_data.split(',')))
 
-        # Append the new row to the DataFrame
-        new_row = pd.DataFrame([position + rotation], columns=columns)
-        data_table = pd.concat([data_table, new_row], ignore_index=True)
-
-        # Clear the output and display updated DataFrame
-        print(data_table.tail())  # Display the last few rows to keep output manageable
+        # Storing the received positions and rotations for plotting
+        positions.append(position_tuple)
+        rotations.append(rotation_tuple)
 
 except KeyboardInterrupt:
     sock.close()
     print("Socket closed")
-    print(data_table)  # Optionally print the entire table at the end
+
+    # Plotting the trajectory
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Extracting x, y, z coordinates for positions
+    x, y, z = zip(*positions)
+    ax.plot(x, y, z, label='Trajectory')
+    
+    # Plotting start and end points
+    ax.scatter(x[0], y[0], z[0], color='green', label='Start')
+    ax.scatter(x[-1], y[-1], z[-1], color='red', label='End')
+    
+    ax.set_xlabel('X Position')
+    ax.set_ylabel('Y Position')
+    ax.set_zlabel('Z Position')
+    ax.legend()
+    
+    plt.show()
+
