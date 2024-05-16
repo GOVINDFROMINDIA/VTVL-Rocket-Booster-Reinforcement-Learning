@@ -1,35 +1,40 @@
 import socket
 import time
+import pandas as pd
 
-def main():
-    host, port = "127.0.0.1", 25001
-    position = [0, 0, 0]  # Initial position
-    rotation = [0, 0, 0]  # Initial rotation
+host, port = "127.0.0.1", 25001
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect((host, port))
 
+# Set up a DataFrame to store and display the data
+columns = ['PosX', 'PosY', 'PosZ', 'RotX', 'RotY', 'RotZ']
+data_table = pd.DataFrame(columns=columns)
+
+try:
     while True:
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect((host, port))
-                for _ in range(100):  # Send data 100 times or until an error occurs
-                    time.sleep(0.5)
-                    position[0] += 1  # Increment X position by one
+        time.sleep(0.5)  # Sleep to simulate real-time communication
 
-                    # Format the position and rotation data
-                    data_string = f"{','.join(map(str, position))};{','.join(map(str, rotation))}"
-                    print(data_string)
-                    sock.sendall(data_string.encode("UTF-8"))
+        # Example control signal (throttle in this case)
+        control_signal = '1.0'  # Example throttle value
+        sock.sendall(control_signal.encode("UTF-8"))
 
-                    received_data = sock.recv(1024).decode("UTF-8")
-                    print(received_data)
+        # Receiving updated position and rotation from Unity
+        received_data = sock.recv(1024).decode("UTF-8").strip()
+        print("Received:", received_data)
 
-                break  # Exit the loop after sending data 100 times
+        # Splitting position and rotation data
+        pos_data, rot_data = received_data.split(';')
+        position = list(map(float, pos_data.split(',')))
+        rotation = list(map(float, rot_data.split(',')))
 
-        except ConnectionError as e:
-            print(f"Connection error: {e}, retrying in 5 seconds...")
-            time.sleep(5)  # Wait for 5 seconds before retrying
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            break  # Break the loop on other exceptions
+        # Append the new row to the DataFrame
+        new_row = pd.DataFrame([position + rotation], columns=columns)
+        data_table = pd.concat([data_table, new_row], ignore_index=True)
 
-if __name__ == "__main__":
-    main()
+        # Clear the output and display updated DataFrame
+        print(data_table.tail())  # Display the last few rows to keep output manageable
+
+except KeyboardInterrupt:
+    sock.close()
+    print("Socket closed")
+    print(data_table)  # Optionally print the entire table at the end
